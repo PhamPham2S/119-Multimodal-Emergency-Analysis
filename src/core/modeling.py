@@ -21,6 +21,7 @@ class FusionModel(nn.Module):
         dropout: float = 0.2,
     ) -> None:
         super().__init__()
+        # hard sharing으로 진행
         self.audio_encoder = AudioEncoder(audio_model, pooling=pooling)
         self.text_encoder = TextEncoder(text_model)
         audio_dim = self.audio_encoder.model.config.hidden_size
