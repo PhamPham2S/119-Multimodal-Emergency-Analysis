@@ -4,12 +4,13 @@ import argparse
 import sys
 from pathlib import Path
 
+import torch
+
 SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from core.data_pipeline import build_dataloader
-from core.losses import train_step
 from core.modeling import FusionModel
 
 
@@ -42,8 +43,20 @@ def main() -> None:
         sentiment_levels=len(label_mapper.sentiment_order),
     )
     batch = next(iter(loader))
-    loss = train_step(model, batch)
-    print(f"batch_size={batch['input_values'].shape[0]} loss={loss.item():.4f}")
+    model.eval()
+    with torch.no_grad():
+        outputs = model(batch)
+    urgency_ids = (outputs["urgency_logits"] > 0).sum(dim=1).tolist()
+    sentiment_ids = outputs["sentiment_logits"].argmax(dim=1).tolist()
+    for idx, (urg_id, sent_id) in enumerate(zip(urgency_ids, sentiment_ids)):
+        print(f"\nsample={idx} urgency_logits={outputs["urgency_logits"][idx]} sentiment_logits={outputs["sentiment_logits"][idx]}")
+        print(f"sample={idx} urgency_ids={urgency_ids[idx]} sentiment_ids={sentiment_ids[idx]}")
+        urgency = label_mapper.urgency_order[urg_id]
+        sentiment = label_mapper.sentiment_order[sent_id]
+        print(f"sample={idx} urgency_pred={urgency} sentiment_pred={sentiment}")
+        
+        print(f"\nsample={idx} urgency_ids_y={outputs["urgency"][idx]} sentiment_ids_y={outputs["sentiment"][idx]}")
+        print(f"sample={idx} urgency_y={label_mapper.urgency_order[outputs["urgency"][idx]]} sentiment_y={label_mapper.sentiment_order[outputs["sentiment"][idx]]}")
 
 
 if __name__ == "__main__":

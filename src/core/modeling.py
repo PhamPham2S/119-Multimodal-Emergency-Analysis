@@ -41,4 +41,6 @@ class FusionModel(nn.Module):
         return {
             "urgency_logits": self.urgency_head(shared),
             "sentiment_logits": self.sentiment_head(shared),
+            "urgency": batch["urgency"],
+            "sentiment": batch["sentiment"],
         }
