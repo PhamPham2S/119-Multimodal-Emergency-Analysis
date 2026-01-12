@@ -2,11 +2,10 @@
 .env
 
 # Data
-data/
+data/Sample/
 
 # Logs
 logs/
 
-# Cache
-cache/
+# __pycache__
 __pycache__/
