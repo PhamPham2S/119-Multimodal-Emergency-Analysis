@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from audio.io import load_audio
+from audio.data_io import load_audio
 from text.processing import extract_text
 
 try:
