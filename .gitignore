@@ -1,0 +1,12 @@
+# API
+.env
+
+# Data
+data/
+
+# Logs
+logs/
+
+# Cache
+cache/
+__pycache__/

@@ -1,0 +1,6 @@
+torch
+transformers
+numpy
+scipy
+soundfile
+soundfile
