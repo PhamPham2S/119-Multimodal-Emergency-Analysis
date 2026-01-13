@@ -84,6 +84,7 @@ class DummyFusionModel(nn.Module):
         }
 
 # Model
+# dummy data to test
 text_model = DummyTextEncoder(hidden_size=768)
 audio_model = DummyAudioEncoder(hidden_size=768)
 
