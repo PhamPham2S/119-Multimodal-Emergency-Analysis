@@ -1,144 +1,85 @@
+# train_sample.py
 from pathlib import Path
 import sys
+import torch
+import torch.nn as nn
+from torch.optim import Adam
+from torch.utils.data import DataLoader
 
-# Path 설정
+# src 경로 추가
 SRC_ROOT = Path(__file__).resolve().parent / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
-
+# 파이프라인, 모델, loss, grad monitor 불러오기
+from core.data_pipeline import build_dataloader
 from core.modeling import FusionModel
 from core.multitask import MultiTaskLoss, MultiTaskLossController
-from core.losses import ordinal_loss
 from core.grad_monitor import GradMonitor
+from core.losses import ordinal_loss
 
+# 학습 설정
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+BATCH_SIZE = 4
+EPOCHS = 3
+LEARNING_RATE = 1e-4
 
-# Sample!!!!!!!!!!!!!
-# Sample!!!!!!!!!!!!!
+# 데이터 로더 (Sample 데이터 사용)
+data_dir = Path(__file__).resolve().parent / "data" / "Sample"
+train_loader = build_dataloader(data_dir, batch_size=BATCH_SIZE, shuffle=True)
 
-# 아래는 모두 sample에 맞게 수정해야함
+# 모델 초기화
+model = FusionModel(
+    audio_dim=768,      # 예시 값, 실제 encoder 출력 차원 확인
+    text_dim=768,       # 예시 값, 실제 encoder 출력 차원 확인
+    hidden_dim=256,
+    num_urgency_classes=3,
+    num_sentiment_classes=4
+).to(DEVICE)
 
-
-# Dummy encoders
-class DummyAudioEncoder(nn.Module):
-    def __init__(self, hidden_size: int = 768):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.config = type("Config", (), {"hidden_size": hidden_size})()
-
-    def forward(self, input_values, attention_mask=None):
-        batch_size = input_values.size(0)
-        return torch.zeros(batch_size, self.hidden_size, device=input_values.device, dtype=torch.float)
-
-
-class DummyTextEncoder(nn.Module):
-    def __init__(self, hidden_size: int = 768):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.config = type("Config", (), {"hidden_size": hidden_size})()
-
-    def forward(self, input_ids, attention_mask=None):
-        batch_size = input_ids.size(0)
-        return torch.zeros(batch_size, self.hidden_size, device=input_ids.device, dtype=torch.float)
-
-
-# Dummy dataset
-class DummyDataset(Dataset):
-    def __len__(self):
-        return 2
-
-    def __getitem__(self, idx):
-        return {
-            "input_values": torch.randn(16000, dtype=torch.float),  # audio dummy
-            "input_ids": torch.randint(0, 1000, (32,), dtype=torch.long),
-            "audio_mask": torch.ones(16000, dtype=torch.float),
-            "text_mask": torch.ones(32, dtype=torch.float),
-            "urgency": torch.tensor(1, dtype=torch.float),          # ordinal label float
-            "sentiment": torch.tensor(2, dtype=torch.long),         # class label LongTensor
-        }
-
-
-def collate_fn(batch):
-    return {
-        "input_values": torch.stack([b["input_values"] for b in batch]),
-        "input_ids": torch.stack([b["input_ids"] for b in batch]),
-        "audio_mask": torch.stack([b["audio_mask"] for b in batch]),
-        "text_mask": torch.stack([b["text_mask"] for b in batch]),
-        "urgency": torch.stack([b["urgency"] for b in batch]),
-        "sentiment": torch.stack([b["sentiment"] for b in batch]),
-    }
-
-
-# Dummy FusionModel
-class DummyFusionModel(nn.Module):
-    def __init__(self, audio_model, text_model, urgency_levels=3, sentiment_levels=4):
-        super().__init__()
-        self.audio_model = audio_model
-        self.text_model = text_model
-        self.urgency_fc = nn.Linear(audio_model.hidden_size + text_model.hidden_size, urgency_levels)
-        self.sentiment_fc = nn.Linear(audio_model.hidden_size + text_model.hidden_size, sentiment_levels)
-
-    def forward(self, batch):
-        audio_feat = self.audio_model(batch["input_values"], batch.get("audio_mask"))
-        text_feat = self.text_model(batch["input_ids"], batch.get("text_mask"))
-        fused = torch.cat([audio_feat, text_feat], dim=-1)
-        return {
-            "urgency": self.urgency_fc(fused).float(),      # logits float
-            "sentiment": self.sentiment_fc(fused),          # logits float
-        }
-
-# Model
-# dummy data to test
-text_model = DummyTextEncoder(hidden_size=768)
-audio_model = DummyAudioEncoder(hidden_size=768)
-
-model = DummyFusionModel(
-    audio_model=audio_model,
-    text_model=text_model,
-    urgency_levels=3,       # 하 / 중 / 상
-    sentiment_levels=4,     # 감정 클래스 수
-)
-
-# Loss
+# MultiTask Loss 설정
 controller = MultiTaskLossController(
-    warmup_epochs=0,
+    warmup_epochs=1,
     urgency_weight=1.0,
-    sentiment_weight=1.0,
-    use_uncertainty=False,
+    sentiment_weight=0.5,
+    use_uncertainty=False
 )
-
 criterion = MultiTaskLoss(
     urgency_loss_fn=ordinal_loss,
     sentiment_loss_fn=nn.CrossEntropyLoss(),
-    controller=controller,
+    controller=controller
 )
 
+# 옵티마이저
+optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
+
+# GradMonitor 초기화
 grad_monitor = GradMonitor(model)
-dataset = DummyDataset()
-loader = DataLoader(dataset, batch_size=2, collate_fn=collate_fn)
-batch = next(iter(loader))
-outputs = model(batch)
 
-loss_dict = criterion(
-    outputs=outputs,
-    targets={
-        "urgency": batch["urgency"],
-        "sentiment": batch["sentiment"],
-    },
-    epoch=0,
-)
+# 학습 루프
+for epoch in range(EPOCHS):
+    model.train()
+    for batch_idx, batch in enumerate(train_loader):
+        audio = batch['audio'].to(DEVICE)
+        text = batch['text'].to(DEVICE)
+        urgency_label = batch['urgency'].to(DEVICE)
+        sentiment_label = batch['sentiment'].to(DEVICE)
+        attention_mask = batch.get('attention_mask', None)
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(DEVICE)
 
-print("Loss dict:", loss_dict)
+        optimizer.zero_grad()
+        outputs = model(audio, text, attention_mask=attention_mask)
 
-# Gradient analysis
-grad_stats = grad_monitor.compute(
-    {
-        "urgency": loss_dict["urgency"],
-        "sentiment": loss_dict["sentiment"],
-    }
-)
+        loss = criterion(outputs, urgency_label, sentiment_label)
+        loss.backward()
 
-print("Gradient stats:", grad_stats)
+        # gradient 모니터링
+        grad_monitor.log()  # task별 gradient norm, cosine similarity 출력
+
+        optimizer.step()
+
+        if batch_idx % 5 == 0:
+            print(f"Epoch [{epoch+1}/{EPOCHS}], Batch [{batch_idx}], Loss: {loss.item():.4f}")
+
+print("학습 완료")
