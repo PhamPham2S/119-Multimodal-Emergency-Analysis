@@ -15,27 +15,35 @@ from core.multitask import MultiTaskLoss, MultiTaskLossController
 from core.losses import ordinal_loss
 from core.grad_monitor import GradMonitor
 
+# =========================
+# Dummy encoders
+# =========================
 class DummyAudioEncoder(nn.Module):
     def __init__(self, hidden_size: int = 768):
         super().__init__()
         self.hidden_size = hidden_size
+        # HuggingFace 호환용 config
+        self.config = type("Config", (), {"hidden_size": hidden_size})()
 
-    def forward(self, input_values):
+    def forward(self, input_values, attention_mask=None):
         batch_size = input_values.size(0)
         return torch.zeros(batch_size, self.hidden_size, device=input_values.device)
 
 
-# Dummy components (디버그용)
 class DummyTextEncoder(nn.Module):
     def __init__(self, hidden_size: int = 768):
         super().__init__()
         self.hidden_size = hidden_size
+        self.config = type("Config", (), {"hidden_size": hidden_size})()
 
     def forward(self, input_ids, attention_mask=None):
         batch_size = input_ids.size(0)
         return torch.zeros(batch_size, self.hidden_size, device=input_ids.device)
 
 
+# =========================
+# Dummy dataset
+# =========================
 class DummyDataset(Dataset):
     def __len__(self):
         return 2
@@ -44,9 +52,10 @@ class DummyDataset(Dataset):
         return {
             "input_values": torch.randn(16000),      # audio dummy
             "input_ids": torch.randint(0, 1000, (32,)),
-            "attention_mask": torch.ones(32),
-            "urgency": torch.tensor(1),               # ordinal label
-            "sentiment": torch.tensor(2),             # class label
+            "audio_mask": torch.ones(16000),        # optional mask
+            "text_mask": torch.ones(32),            # optional mask
+            "urgency": torch.tensor(1),             # ordinal label
+            "sentiment": torch.tensor(2),           # class label
         }
 
 
@@ -54,41 +63,50 @@ def collate_fn(batch):
     return {
         "input_values": torch.stack([b["input_values"] for b in batch]),
         "input_ids": torch.stack([b["input_ids"] for b in batch]),
-        "attention_mask": torch.stack([b["attention_mask"] for b in batch]),
+        "audio_mask": torch.stack([b["audio_mask"] for b in batch]),
+        "text_mask": torch.stack([b["text_mask"] for b in batch]),
         "urgency": torch.stack([b["urgency"] for b in batch]),
         "sentiment": torch.stack([b["sentiment"] for b in batch]),
     }
 
 
+# =========================
 # Model
+# =========================
 text_model = DummyTextEncoder(hidden_size=768)
 audio_model = DummyAudioEncoder(hidden_size=768)
 
 model = FusionModel(
-    audio_model= audio_model,
-    text_model= text_model,
+    audio_model=audio_model,
+    text_model=text_model,
     urgency_levels=3,       # 하 / 중 / 상
     sentiment_levels=4,     # 감정 클래스 수
 )
 
+# =========================
 # Loss
+# =========================
 controller = MultiTaskLossController(
-    warmup_epochs=0,        # debug에서는 바로 multitask
-    urgency_weight=1.0,     # 일단 둘 다 1.0
-    sentiment_weight =1.0,
+    warmup_epochs=0,       
+    urgency_weight=1.0,    
+    sentiment_weight=1.0,
     use_uncertainty=False,
 )
 
 criterion = MultiTaskLoss(
-    urgency_loss_fn=ordinal_loss, # ordinal loss 사용
+    urgency_loss_fn=ordinal_loss,
     sentiment_loss_fn=nn.CrossEntropyLoss(),
     controller=controller,
 )
 
+# =========================
 # Gradient monitor
+# =========================
 grad_monitor = GradMonitor(model)
 
+# =========================
 # Data
+# =========================
 dataset = DummyDataset()
 loader = DataLoader(
     dataset,
@@ -98,14 +116,14 @@ loader = DataLoader(
 
 batch = next(iter(loader))
 
+# =========================
 # Forward
-outputs = model(
-    input_values=batch["input_values"],
-    input_ids=batch["input_ids"],
-    attention_mask=batch["attention_mask"],
-)
+# =========================
+outputs = model(batch)  # <-- batch dict 하나로 통일
 
+# =========================
 # Loss
+# =========================
 loss_dict = criterion(
     outputs=outputs,
     targets={
@@ -117,7 +135,9 @@ loss_dict = criterion(
 
 print("Loss dict:", loss_dict)
 
+# =========================
 # Gradient analysis
+# =========================
 grad_stats = grad_monitor.compute(
     {
         "urgency": loss_dict["urgency"],

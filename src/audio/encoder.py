@@ -46,6 +46,13 @@ class AttentivePooling(nn.Module):
         return torch.sum(sequence * weights.unsqueeze(-1), dim=1)
 
 
+class _DummyConfig:
+    """HuggingFace config 흉내"""
+
+    def __init__(self, hidden_size: int):
+        self.hidden_size = hidden_size
+
+
 class AudioEncoder(nn.Module):
     def __init__(
         self,
@@ -58,12 +65,19 @@ class AudioEncoder(nn.Module):
         # Dummy encoder 분기
         # =========================
         if isinstance(model, nn.Module):
-            self.model = model
-            self.is_dummy = True
-
             hidden_size = getattr(model, "hidden_size", None)
             if hidden_size is None:
-                raise ValueError("DummyAudioEncoder must have `hidden_size` attribute")
+                raise ValueError(
+                    "DummyAudioEncoder must have `hidden_size` attribute"
+                )
+
+            self.is_dummy = True
+            self.hidden_size = hidden_size
+
+            # HuggingFace 호환용 config 강제 주입
+            self.model = model
+            if not hasattr(self.model, "config"):
+                self.model.config = _DummyConfig(hidden_size)
 
             self.pooling_mode = None
             self.pool = None
@@ -75,17 +89,18 @@ class AudioEncoder(nn.Module):
         # =========================
         self.is_dummy = False
         self.model = AutoModel.from_pretrained(model)
-        hidden_size = self.model.config.hidden_size
+
+        self.hidden_size = self.model.config.hidden_size
 
         self.pooling_mode = pooling
         if pooling == "mean":
             self.pool = None
         elif pooling == "attn":
-            self.pool = AttentivePooling(hidden_size)
+            self.pool = AttentivePooling(self.hidden_size)
         else:
             raise ValueError(f"Unsupported pooling: {pooling}")
 
-        self.proj = nn.Linear(hidden_size, hidden_size)
+        self.proj = nn.Linear(self.hidden_size, self.hidden_size)
 
     def _feature_mask(
         self,
