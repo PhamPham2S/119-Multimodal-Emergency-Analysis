@@ -74,7 +74,7 @@ model = FusionModel(
 # Loss
 controller = MultiTaskLossController(
     warmup_epochs=0,        # debug에서는 바로 multitask
-    urgency_weight=1.0,
+    urgency_weight=1.0,     # 일단 둘 다 1.0
     sentiment_weight =1.0,
     use_uncertainty=False,
 )
