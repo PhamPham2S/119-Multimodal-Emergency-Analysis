@@ -15,6 +15,16 @@ from core.multitask import MultiTaskLoss, MultiTaskLossController
 from core.losses import ordinal_loss
 from core.grad_monitor import GradMonitor
 
+class DummyAudioEncoder(nn.Module):
+    def __init__(self, hidden_size: int = 768):
+        super().__init__()
+        self.hidden_size = hidden_size
+
+    def forward(self, input_values):
+        batch_size = input_values.size(0)
+        return torch.zeros(batch_size, self.hidden_size, device=input_values.device)
+
+
 # Dummy components (디버그용)
 class DummyTextEncoder(nn.Module):
     def __init__(self, hidden_size: int = 768):
@@ -52,9 +62,11 @@ def collate_fn(batch):
 
 # Model
 text_model = DummyTextEncoder(hidden_size=768)
+audio_model = DummyAudioEncoder(hidden_size=768)
 
 model = FusionModel(
-    text_model=text_model,
+    audio_model= audio_model,
+    text_model= text_model,
     urgency_levels=3,       # 하 / 중 / 상
     sentiment_levels=4,     # 감정 클래스 수
 )
@@ -63,12 +75,12 @@ model = FusionModel(
 controller = MultiTaskLossController(
     warmup_epochs=0,        # debug에서는 바로 multitask
     urgency_weight=1.0,
-    sentiment_weight=0.5,
+    sentiment_weight =1.0,
     use_uncertainty=False,
 )
 
 criterion = MultiTaskLoss(
-    urgency_loss_fn=ordinal_loss,
+    urgency_loss_fn=ordinal_loss, # ordinal loss 사용
     sentiment_loss_fn=nn.CrossEntropyLoss(),
     controller=controller,
 )
