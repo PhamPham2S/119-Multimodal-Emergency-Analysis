@@ -8,8 +8,8 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from audio.data_io import load_audio
-from text.processing import extract_text
+from ..audio.data_io import load_audio
+from ..text.processing import extract_text
 
 try:
     from transformers import AutoTokenizer
@@ -137,7 +137,7 @@ def make_collate(
 
 
 def build_dataloader(
-    data_root: Path,
+    data_root: Path(),
     text_model: str,
     sample_rate: int,
     max_text_len: int,
