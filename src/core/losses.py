@@ -7,6 +7,8 @@ import torch.nn as nn
 
 
 def ordinal_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    if logits.dim() == 1:  # [B]
+        logits = logits.unsqueeze(1)  # [B, 1]
     thresholds = logits.shape[1]
     levels = torch.arange(thresholds, device=targets.device)
     targets = targets.unsqueeze(-1)

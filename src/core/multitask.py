@@ -33,7 +33,8 @@ class MultiTaskLoss(nn.Module):
         """
 
         loss_urgency = self.urgency_loss_fn(
-            outputs["urgency"], targets["urgency"]
+            outputs["urgency"].float(),
+            targets["urgency"].float()
         )
 
         loss_sentiment = self.sentiment_loss_fn(
