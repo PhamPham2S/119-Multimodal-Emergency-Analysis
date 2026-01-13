@@ -1,46 +1,48 @@
 from pathlib import Path
-import argparse
-import yaml
 import sys
 
 SRC_ROOT = Path(__file__).resolve().parent / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from src.core.data_pipeline import build_dataloader
+from core.modeling import FusionModel
+from core.multitask import MultiTaskLoss, MultiTaskLossController
+from core.losses import ordinal_loss
+from core.grad_monitor import GradMonitor
+
+import torch.nn as nn
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/local.yaml")
-    parser.add_argument("--data_root", type=str, help="Override data_root from config")
-    args = parser.parse_args()
+model = FusionModel(...)
 
-    # config 경로 해석 (항상 프로젝트 루트 기준)
-    cfg_path = Path(__file__).resolve().parent / args.config
+controller = MultiTaskLossController(
+    warmup_epochs=3,
+    urgency_weight=1.0,
+    sentiment_weight=0.5,
+    use_uncertainty=False,
+)
+criterion = MultiTaskLoss(
+    urgency_loss_fn=ordinal_loss,
+    sentiment_loss_fn=nn.CrossEntropyLoss(),
+    controller=controller,
+)
+grad_monitor = GradMonitor(model)
 
-    if not cfg_path.exists():
-        raise FileNotFoundError(f"Config file not found: {cfg_path}")
+batch = next(iter(loader))
 
-    with open(cfg_path, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+outputs = model(
+    input_values=batch["input_values"],
+    input_ids=batch["input_ids"],
+    attention_mask=batch["attention_mask"],
+)
 
-    data_root = Path(args.data_root) if args.data_root else Path(cfg["data_root"])
+loss_dict = criterion(
+    outputs=outputs,
+    targets={
+        "urgency": batch["urgency"],
+        "sentiment": batch["sentiment"],
+    }
+)
 
-    loader, label_mapper = build_dataloader(
-        data_root=data_root,
-        text_model=cfg["text_model"],
-        sample_rate=cfg["sample_rate"],
-        max_text_len=cfg["max_text_len"],
-        urgency_order=["상", "중", "하"],
-        sentiment_order=["당황/난처", "불안/걱정", "중립", "기타부정"],
-        batch_size=cfg["batch_size"],
-    )
-
-    batch = next(iter(loader))
-    print("Audio batch shape:", batch["input_values"].shape)
-    print("Text input_ids shape:", batch["input_ids"].shape)
-
-
-if __name__ == "__main__":
-    main()
+total_loss = loss_dict["total"]
+print(loss_dict)

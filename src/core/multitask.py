@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict
 
 import torch
 import torch.nn as nn
@@ -66,7 +66,7 @@ class MultiTaskLossController(nn.Module):
                 total = total + precision * loss + log_var
             return total
 
-        # 3. Static / scheduled weighting
+        # 3. Static weighting
         total_loss = 0.0
         for task, loss in losses.items():
             weight = self.base_weights.get(task, 1.0)
@@ -84,3 +84,57 @@ class MultiTaskLossController(nn.Module):
                 for task, log_var in self.log_vars.items()
             }
         return self.base_weights.copy()
+
+
+class MultiTaskLoss(nn.Module):
+    """
+    Public-facing multitask loss wrapper.
+
+    This class exists to provide a stable interface:
+        loss_dict = criterion(outputs, targets, epoch)
+
+    Returns:
+        {
+            "urgency": loss_urg,
+            "sentiment": loss_sent,
+            "total": total_loss
+        }
+    """
+
+    def __init__(
+        self,
+        urgency_loss_fn,
+        sentiment_loss_fn,
+        controller: MultiTaskLossController,
+    ) -> None:
+        super().__init__()
+        self.urgency_loss_fn = urgency_loss_fn
+        self.sentiment_loss_fn = sentiment_loss_fn
+        self.controller = controller
+
+    def forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
+        epoch: int = 0,
+    ) -> Dict[str, torch.Tensor]:
+
+        loss_urg = self.urgency_loss_fn(
+            outputs["urgency"], targets["urgency"]
+        )
+        loss_sent = self.sentiment_loss_fn(
+            outputs["sentiment"], targets["sentiment"]
+        )
+
+        losses = {
+            "urgency": loss_urg,
+            "sentiment": loss_sent,
+        }
+
+        total = self.controller(losses, epoch)
+
+        return {
+            "urgency": loss_urg,
+            "sentiment": loss_sent,
+            "total": total,
+        }

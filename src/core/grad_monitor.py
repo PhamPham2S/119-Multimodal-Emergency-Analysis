@@ -29,9 +29,9 @@ class GradientMonitor:
         """
         Returns:
             {
-                "urgency_norm": ...,
-                "sentiment_norm": ...,
-                "cosine_similarity": ...
+                "urgency_grad_norm": float,
+                "sentiment_grad_norm": float,
+                "grad_cosine_similarity": float
             }
         """
 
@@ -53,10 +53,11 @@ class GradientMonitor:
         for task, g in grads.items():
             stats[f"{task}_grad_norm"] = g.norm(p=2).item()
 
-        # Cosine similarity (only if both exist)
+        # Cosine similarity
         if "urgency" in grads and "sentiment" in grads:
             g1 = grads["urgency"]
             g2 = grads["sentiment"]
+
             if g1.numel() > 0 and g2.numel() > 0:
                 cos = F.cosine_similarity(g1, g2, dim=0)
                 stats["grad_cosine_similarity"] = cos.item()
@@ -64,3 +65,11 @@ class GradientMonitor:
                 stats["grad_cosine_similarity"] = 0.0
 
         return stats
+
+
+class GradMonitor(GradientMonitor):
+    """
+    Alias for external use.
+    Keeps train / debug code concise.
+    """
+    pass
