@@ -1,4 +1,4 @@
-# train_sample.py
+# train_sample.py (수정 완료)
 from pathlib import Path
 import sys
 import torch
@@ -26,15 +26,24 @@ LEARNING_RATE = 1e-4
 
 # 데이터 로더 (Sample 데이터 사용)
 data_dir = Path(__file__).resolve().parent / "data" / "Sample"
-train_loader = build_dataloader(data_dir, batch_size=BATCH_SIZE, shuffle=True)
+train_loader, label_mapper = build_dataloader(
+    data_root=data_dir,
+    text_model="beomi/KcELECTRA-base-v2022",  # KC ELECTRA 모델 지정
+    sample_rate=16000,
+    max_text_len=128,
+    urgency_order=["상", "중", "하"],
+    sentiment_order=["당황/난처", "불안/걱정", "중립", "기타부정"],
+    batch_size=BATCH_SIZE
+)
 
 # 모델 초기화
 model = FusionModel(
-    audio_dim=768,      # 예시 값, 실제 encoder 출력 차원 확인
-    text_dim=768,       # 예시 값, 실제 encoder 출력 차원 확인
-    hidden_dim=256,
-    num_urgency_classes=3,
-    num_sentiment_classes=4
+    audio_model="facebook/wav2vec2-base-960h",  # 예시 오디오 모델
+    text_model="beomi/KcELECTRA-base-v2022",          # KC ELECTRA
+    urgency_levels=3,                            # urgency 클래스 수
+    sentiment_levels=4,                          # sentiment 클래스 수
+    fusion_dim=256,
+    dropout=0.2
 ).to(DEVICE)
 
 # MultiTask Loss 설정
@@ -60,24 +69,20 @@ grad_monitor = GradMonitor(model)
 for epoch in range(EPOCHS):
     model.train()
     for batch_idx, batch in enumerate(train_loader):
-        audio = batch['audio'].to(DEVICE)
-        text = batch['text'].to(DEVICE)
-        urgency_label = batch['urgency'].to(DEVICE)
-        sentiment_label = batch['sentiment'].to(DEVICE)
-        attention_mask = batch.get('attention_mask', None)
-        if attention_mask is not None:
-            attention_mask = attention_mask.to(DEVICE)
+        # batch 그대로 model에 전달
+        for k in batch:
+            batch[k] = batch[k].to(DEVICE)
+        
+        outputs = model(batch)  # FusionModel forward 호출
 
-        optimizer.zero_grad()
-        outputs = model(audio, text, attention_mask=attention_mask)
-
-        loss = criterion(outputs, urgency_label, sentiment_label)
+        loss = criterion(outputs, batch['urgency'], batch['sentiment'])
         loss.backward()
 
         # gradient 모니터링
         grad_monitor.log()  # task별 gradient norm, cosine similarity 출력
 
         optimizer.step()
+        optimizer.zero_grad()
 
         if batch_idx % 5 == 0:
             print(f"Epoch [{epoch+1}/{EPOCHS}], Batch [{batch_idx}], Loss: {loss.item():.4f}")

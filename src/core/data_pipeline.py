@@ -1,15 +1,21 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
+import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
-
 import torch
 from torch.utils.data import DataLoader, Dataset
+# src 폴더를 Python path에 추가
+SRC_ROOT = Path(__file__).resolve().parent / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-from ..audio.data_io import load_audio
-from ..text.processing import extract_text
+import json
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
+
+
+from audio.data_io import load_audio
+from text.processing import extract_text
 
 try:
     from transformers import AutoTokenizer
@@ -137,7 +143,7 @@ def make_collate(
 
 
 def build_dataloader(
-    data_root: Path(),
+    data_root: Path,
     text_model: str,
     sample_rate: int,
     max_text_len: int,
