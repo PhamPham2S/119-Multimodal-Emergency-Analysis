@@ -108,7 +108,6 @@ class AudioTextDataset(Dataset):
         urg_id, sent_id = self.label_mapper.encode(record.urgency, record.sentiment)
         return audio, record.text, urg_id, sent_id
 
-
 def make_collate(
     tokenizer: AutoTokenizer,
     max_text_len: int,
@@ -162,3 +161,70 @@ def build_dataloader(
     collate = make_collate(tokenizer, max_text_len)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate)
     return loader, label_mapper
+
+
+# For Train
+from typing import List, Dict
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+
+class EmbeddingDataset(Dataset):
+    def __init__(
+        self,
+        audio_embeds: List[torch.Tensor],
+        text_embeds: List[torch.Tensor],
+        urgencies: List[int],
+        sentiments: List[int],
+    ):
+        assert len(audio_embeds) == len(text_embeds) == len(urgencies) == len(sentiments)
+
+        self.audio_embeds = audio_embeds
+        self.text_embeds = text_embeds
+        self.urgencies = urgencies
+        self.sentiments = sentiments
+
+    def __len__(self):
+        return len(self.audio_embeds)
+
+    def __getitem__(self, idx):
+        return {
+            "audio_embed": torch.from_numpy(self.audio_embeds[idx]).float(),
+            "text_embed": torch.from_numpy(self.text_embeds[idx]).float(),
+            "urgency": torch.tensor(self.urgencies[idx]),
+            "sentiment": torch.tensor(self.sentiments[idx]),
+        }
+
+def embedding_collate(batch):
+    return {
+        "audio_embed": torch.stack([b["audio_embed"] for b in batch]),
+        "text_embed": torch.stack([b["text_embed"] for b in batch]),
+        "urgency": torch.stack([b["urgency"] for b in batch]),
+        "sentiment": torch.stack([b["sentiment"] for b in batch]),
+    }
+
+def build_embedding_dataloader(
+    audio_embeds: List[torch.Tensor],
+    text_embeds: List[torch.Tensor],
+    urgencies: List[int],
+    sentiments: List[int],
+    batch_size: int = 8,
+    shuffle: bool = True,
+) -> DataLoader:
+
+    dataset = EmbeddingDataset(
+        audio_embeds=audio_embeds,
+        text_embeds=text_embeds,
+        urgencies=urgencies,
+        sentiments=sentiments,
+    )
+
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=embedding_collate,
+    )
+
+    return loader
+

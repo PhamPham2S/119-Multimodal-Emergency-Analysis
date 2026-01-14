@@ -33,8 +33,8 @@ class MultiTaskLoss(nn.Module):
         """
 
         loss_urgency = self.urgency_loss_fn(
-            outputs["urgency"].float(),
-            targets["urgency"].float()
+            outputs["urgency"],
+            targets["urgency"],
         )
 
         loss_sentiment = self.sentiment_loss_fn(
@@ -107,15 +107,17 @@ class MultiTaskLossController(nn.Module):
 
         # 2. Uncertainty-based weighting
         if self.use_uncertainty:
-            total = 0.0
+            device = next(iter(losses.values())).device
+            total = torch.zeros((), device=device)
             for task, loss in losses.items():
                 log_var = self.log_vars[task]
                 precision = torch.exp(-log_var)
                 total = total + precision * loss + log_var
             return total
 
-        # 3. Static / scheduled weighting
-        total_loss = 0.0
+        # 3. Static weighting
+        device = next(iter(losses.values())).device
+        total_loss = torch.zeros((), device=device)
         for task, loss in losses.items():
             weight = self.base_weights.get(task, 1.0)
             total_loss = total_loss + weight * loss

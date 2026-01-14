@@ -70,6 +70,44 @@ class FusionModel(nn.Module):
         return {
             "urgency_logits": self.urgency_head(shared),
             "sentiment_logits": self.sentiment_head(shared),
-            "urgency": batch.get("urgency", None),
-            "sentiment": batch.get("sentiment", None),
+        }
+
+class FusionModel_train(nn.Module):
+    def __init__(
+        self,
+        urgency_levels: int,
+        sentiment_levels: int,
+        pooling: str = "attn",
+        fusion_dim: int = 256,
+        dropout: float = 0.2,
+    ) -> None:
+        super().__init__()
+
+        # 임베딩 차원
+        audio_dim = 781
+        text_dim = 768
+
+        # Fusion layer
+        self.fusion = nn.Sequential(
+            nn.LayerNorm(audio_dim + text_dim),
+            nn.Linear(audio_dim + text_dim, fusion_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        )
+
+        # Output heads
+        self.urgency_head = nn.Linear(fusion_dim, urgency_levels - 1)  # ordinal
+        self.sentiment_head = nn.Linear(fusion_dim, sentiment_levels)  # class
+
+    def forward(self, batch):
+        audio_embed = batch["audio_embed"]   # (B, D_a)
+        text_embed = batch["text_embed"]     # (B, D_t)
+
+        shared = self.fusion(
+            torch.cat([audio_embed, text_embed], dim=-1)
+        )
+
+        return {
+            "urgency": self.urgency_head(shared),
+            "sentiment": self.sentiment_head(shared),
         }
