@@ -2,19 +2,19 @@
 
 ## 👥 Team & Roles
 
-- **전체(2)**  
+- **전체(2)**  @Jinhyeok33 @EalZz
   - 문제 정의, 모델 아키텍처 설계 및 고도화
   - 실험 설계, 결과 해석, 발표 자료 정리  
 
-- **오디오 담당**  
+- **오디오 담당**  @PhamPham2S
   - 음성 전처리 및 인코더 구축  
   - HuBERT/wav2vec2 기반 오디오 인코더 실험  
 
-- **텍스트 담당**  
+- **텍스트 담당**  @iaynu
   - STT 텍스트 처리 기준 정의  
   - 텍스트 인코더 구축 및 분석  
 
-- **학습 담당**  
+- **학습 담당**  @lucete171
   - Dataset / DataLoader 구성  
   - 멀티태스크 학습 루프 및 loss 설계  
 
@@ -56,6 +56,15 @@
   - 음성 파일 (wav)
   - STT 텍스트
   - 긴급도 및 감정상태 라벨
+- **종합 데이터셋**: `./data/emb/total_emb.pkl`
+  ```
+  {"file_id":
+    {"audio": <audio_embeddings>,
+     "text": <text_embeddings>,
+     "urgency": <urgency_str>,
+     "sentiment": <sentiment_str>
+     },
+  ... }
 
 ### 데이터 전략
 
@@ -115,7 +124,7 @@ Linear → ReLU → Dropout → Linear
 - Audio / Text 인코더는 고정
 - Fusion 및 Head만 학습
 - **Loss**
-- Urgency: Ordinal 또는 Weighted Cross Entropy
+- Urgency: Ordinal
 - Sentiment: Cross Entropy
 - **Class imbalance 대응**
 - class weight 적용
@@ -159,7 +168,7 @@ Linear → ReLU → Dropout → Linear
 ---
 
 ## 📂 Project Structure
-
+```text
 NewJeans-5
 ├── service/
 | ├── frontend/
@@ -170,17 +179,27 @@ NewJeans-5
 | ├── audio/ # 음성 전처리 및 오디오 인코더
 | ├── text/  # 텍스트 인코더 및 처리
 | └── train/ # 학습, loss, dataset
+├── train.ipynb  # 코랩용 학습 스크립트
 └── requirements.txt
-
+```
 ---
 
 ## ▶ How to Run
 ```bash
-# 학습
-python scripts/train.py
+# 의존성 설치
+python -m pip install -r requirements.txt
 
-# 평가
-python scripts/eval.py
+# 파이프라인(랜덤 간단 추론 1배치)
+python src/core/pipeline.py
+
+# 임베딩 시각화(PCA 2D)
+python src/audio/visualize_embeddings.py --data-root data/Sample --max-samples 100 --color-by urgency
+
+# 서버 + 프론트 실행
+python -m uvicorn service.backend.app:app --reload --port 8000
+
+# 접속: http://localhost:8000
+
 ⚠ Limitations & Future Work
 긴 통화에 대한 turn-level modeling 미적용
 
