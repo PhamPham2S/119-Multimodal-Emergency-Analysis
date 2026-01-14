@@ -1,0 +1,15 @@
+# configs/local.yaml - 개인 환경 설정
+
+# 데이터 경로 (프로젝트 루트 기준)
+data_root: "data/Sample"
+
+# 학습 하이퍼파라미터
+batch_size: 8
+sample_rate: 16000
+max_text_len: 128
+num_epochs: 10
+learning_rate: 1e-4
+
+# 모델 관련
+text_model: beomi/kcbert-base  # KcELECTRA 계열 모델로 변경
+audio_model: "facebook/wav2vec2-base"
