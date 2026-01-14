@@ -5,6 +5,54 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 
+class MultiTaskLoss(nn.Module):
+    def __init__(
+        self,
+        urgency_loss_fn,
+        sentiment_loss_fn,
+        controller: MultiTaskLossController,
+    ) -> None:
+        super().__init__()
+        self.urgency_loss_fn = urgency_loss_fn
+        self.sentiment_loss_fn = sentiment_loss_fn
+        self.controller = controller
+
+    def forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor],
+        epoch: int,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Returns:
+            {
+                "urgency": urgency_loss,
+                "sentiment": sentiment_loss,
+                "total": total_loss
+            }
+        """
+
+        loss_urgency = self.urgency_loss_fn(
+            outputs["urgency"].float(),
+            targets["urgency"].float()
+        )
+
+        loss_sentiment = self.sentiment_loss_fn(
+            outputs["sentiment"], targets["sentiment"]
+        )
+
+        losses = {
+            "urgency": loss_urgency,
+            "sentiment": loss_sentiment,
+        }
+
+        total_loss = self.controller(losses, epoch)
+
+        return {
+            **losses,
+            "total": total_loss,
+        }
+
 
 class MultiTaskLossController(nn.Module):
     """

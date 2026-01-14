@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Union, Optional
+
 import torch
 import torch.nn as nn
 
@@ -11,14 +13,66 @@ except ImportError as exc:  # pragma: no cover
 from core.utils import masked_mean
 
 
-class TextEncoder(nn.Module):
-    def __init__(self, model_name: str) -> None:
-        super().__init__()
-        self.model = AutoModel.from_pretrained(model_name)
+class _DummyConfig:
+    """HuggingFace 호환용 config 흉내"""
+    def __init__(self, hidden_size: int):
+        self.hidden_size = hidden_size
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+
+class TextEncoder(nn.Module):
+    def __init__(self, model: Union[str, nn.Module]) -> None:
+        super().__init__()
+
+        # =========================
+        # Dummy encoder 분기
+        # =========================
+        if isinstance(model, nn.Module):
+            hidden_size = getattr(model, "hidden_size", None)
+            if hidden_size is None:
+                raise ValueError("DummyTextEncoder must have `hidden_size` attribute")
+
+            self.is_dummy = True
+            self.model = model
+
+            # HuggingFace 호환용 config 강제 주입
+            if not hasattr(self.model, "config"):
+                self.model.config = _DummyConfig(hidden_size)
+
+            self.hidden_size = hidden_size
+            self.proj = nn.Identity()
+            return
+
+        # =========================
+        # HuggingFace encoder
+        # =========================
+        self.is_dummy = False
+        self.model = AutoModel.from_pretrained(model)
+
+        self.hidden_size = self.model.config.hidden_size
+        self.proj = nn.Identity()
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+
+        # =========================
+        # Dummy forward
+        # =========================
+        if self.is_dummy:
+            return self.model(input_ids)
+
+        # =========================
+        # HuggingFace forward
+        # =========================
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
+
         pooled = getattr(outputs, "pooler_output", None)
         if pooled is not None:
-            return pooled
-        return masked_mean(outputs.last_hidden_state, attention_mask)
+            return self.proj(pooled)
+
+        return self.proj(masked_mean(outputs.last_hidden_state, attention_mask))

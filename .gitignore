@@ -4,6 +4,9 @@
 # Data
 data/Sample/
 
+# configs
+configs/local.yaml
+
 # Logs
 logs/
 
