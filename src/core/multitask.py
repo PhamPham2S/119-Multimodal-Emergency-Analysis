@@ -114,10 +114,3 @@ class MultiTaskLossController(nn.Module):
 
         return total_loss
 
-    def get_current_weights(self) -> Dict[str, float]:
-        if self.use_uncertainty:
-            return {
-                task: float(torch.exp(-log_var).detach().cpu())
-                for task, log_var in self.log_vars.items()
-            }
-        return self.base_weights.copy()
