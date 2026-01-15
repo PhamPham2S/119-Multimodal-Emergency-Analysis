@@ -1,5 +1,8 @@
 # 🚨 멀티모달 기반 119 신고 긴급도 판별
 
+## Demo
+![LikeLion_실전프로젝트01_시연영상_압축본](https://github.com/user-attachments/assets/81dbb74e-2bf2-4fa6-81c6-b1703033bcee)
+
 ## 👥 Team & Roles
 
 - **전체(2)**  @Jinhyeok33 @EalZz
@@ -90,9 +93,10 @@
 
 ---
 
+
 ## 🏗 Model Architecture
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/914a9fab-0141-47dc-8fe0-ea837d7dbd26" width="413"/>
+  <img src="https://github.com/user-attachments/assets/a87a8e38-7fb3-4ebf-8fd8-3c447270d96a" width="413"/>
 </div>
 
 ### Audio Encoder
@@ -169,16 +173,19 @@ Linear → ReLU → Dropout Linear → ReLU → Dropout → urgency head
 
 ## 📂 Project Structure
 ```text
-NewJeans-5
-├── service/
+119-Multimodal-Emergency-Analysis
+├── data/
+| ├── emb/     # 사전 임베딩 벡터(.npy, .pkl)
+| └── Sample/  # 샘플 데이터(.wav, .json)
+├── models/    # 학습된 모델 가중치(.pt)
+├── service/   # 로컬 서버 추론용
 | ├── frontend/
 | ├── backend/
 | ├── plan_frontend.md
 ├── src/
-| ├── core/  # 전체 아키텍처 및 파이프라인
-| ├── audio/ # 음성 전처리 및 오디오 인코더
-| ├── text/  # 텍스트 인코더 및 처리
-| └── train/ # 학습, loss, dataset
+| ├── core/    # 전체 파이프라인 및 학습 코드
+| ├── audio/   # 음성 전처리 및 오디오 인코더
+| └── text/    # 텍스트 인코더 및 처리
 ├── train.ipynb  # 코랩용 학습 스크립트
 └── requirements.txt
 ```
