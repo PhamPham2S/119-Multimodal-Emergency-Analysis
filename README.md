@@ -93,9 +93,10 @@
 
 ---
 
+
 ## 🏗 Model Architecture
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/914a9fab-0141-47dc-8fe0-ea837d7dbd26" width="413"/>
+  <img src="https://github.com/user-attachments/assets/a87a8e38-7fb3-4ebf-8fd8-3c447270d96a" width="413"/>
 </div>
 
 ### Audio Encoder
