@@ -55,20 +55,11 @@ class MultiTaskLoss(nn.Module):
 
 
 class MultiTaskLossController(nn.Module):
-    """
-    Multi-task loss controller for urgency / sentiment.
-
-    Responsibilities:
-    - urgency-only warmup
-    - static or scheduled loss weighting
-    - optional uncertainty-based weighting
-    """
-
     def __init__(
         self,
         warmup_epochs: int = 0,
-        urgency_weight: float = 1.0,
-        sentiment_weight: float = 1.0,
+        urgency_weight: float = 1.0, # 초기 설정값
+        sentiment_weight: float = 1.0, # 초기 설정값
         use_uncertainty: bool = False,
     ) -> None:
         super().__init__()
@@ -82,7 +73,6 @@ class MultiTaskLossController(nn.Module):
         self.use_uncertainty = use_uncertainty
 
         if use_uncertainty:
-            # log(sigma^2) 형태로 두는 것이 수치적으로 안정적
             self.log_vars = nn.ParameterDict(
                 {
                     "urgency": nn.Parameter(torch.zeros(1)),
@@ -125,9 +115,6 @@ class MultiTaskLossController(nn.Module):
         return total_loss
 
     def get_current_weights(self) -> Dict[str, float]:
-        """
-        For logging / debugging.
-        """
         if self.use_uncertainty:
             return {
                 task: float(torch.exp(-log_var).detach().cpu())
