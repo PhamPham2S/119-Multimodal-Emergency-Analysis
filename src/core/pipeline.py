@@ -20,7 +20,7 @@ from text.encoder import build_text_encoder
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audio+Text urgency pipeline")
     parser.add_argument("--data-root", type=Path, default=Path("data/Sample"))
-    parser.add_argument("--audio-model", type=str, default="facebook/hubert-base-ls960")
+    parser.add_argument("--audio-model", type=str, default="facebook/wav2vec2-base-960h")
     parser.add_argument("--text-model", type=str, default="beomi/KcELECTRA-base")
     parser.add_argument("--sample-rate", type=int, default=16000)
     parser.add_argument("--max-text-len", type=int, default=256)

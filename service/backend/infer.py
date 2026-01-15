@@ -19,7 +19,8 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise SystemExit("transformers is required for inference") from exc
 
-from audio.io import load_audio, resample_audio
+from audio.data_io import load_audio, resample_audio
+from audio.features import extract_handcrafted_features
 from core.data_pipeline import build_records
 from core.modeling import FusionModel
 
@@ -105,18 +106,33 @@ class InferenceEngine:
         urgency_path = model_dir / "urgency_head.pt"
         sentiment_path = model_dir / "sentiment_head.pt"
 
+        def _strip_prefix(state: dict, prefix: str) -> dict:
+            return {k[len(prefix):]: v for k, v in state.items() if k.startswith(prefix)}
+
         if fusion_path.exists():
-            self.model.fusion[1].load_state_dict(torch.load(fusion_path, map_location=self.device))
+            fusion_state = torch.load(fusion_path, map_location=self.device)
+            if any(k.startswith("fusion.") for k in fusion_state):
+                fusion_state = _strip_prefix(fusion_state, "fusion.")
+            if any(k.startswith("0.") for k in fusion_state):
+                self.model.fusion.load_state_dict(fusion_state, strict=False)
+            else:
+                self.model.fusion[1].load_state_dict(fusion_state, strict=False)
         else:
             print(f"[warn] Missing {fusion_path}, using random init for fusion linear.")
 
         if urgency_path.exists():
-            self.model.urgency_head.load_state_dict(torch.load(urgency_path, map_location=self.device))
+            urgency_state = torch.load(urgency_path, map_location=self.device)
+            if any(k.startswith("urgency_head.") for k in urgency_state):
+                urgency_state = _strip_prefix(urgency_state, "urgency_head.")
+            self.model.urgency_head.load_state_dict(urgency_state, strict=False)
         else:
             print(f"[warn] Missing {urgency_path}, using random init for urgency head.")
 
         if sentiment_path.exists():
-            self.model.sentiment_head.load_state_dict(torch.load(sentiment_path, map_location=self.device))
+            sentiment_state = torch.load(sentiment_path, map_location=self.device)
+            if any(k.startswith("sentiment_head.") for k in sentiment_state):
+                sentiment_state = _strip_prefix(sentiment_state, "sentiment_head.")
+            self.model.sentiment_head.load_state_dict(sentiment_state, strict=False)
         else:
             print(f"[warn] Missing {sentiment_path}, using random init for sentiment head.")
 
@@ -133,12 +149,14 @@ class InferenceEngine:
     def _predict(self, waveform: torch.Tensor, text: str) -> InferenceResult:
         input_values = waveform.unsqueeze(0).to(self.device)
         audio_mask = torch.ones_like(input_values, dtype=torch.long)
+        handcrafted = extract_handcrafted_features(waveform, self.sample_rate).unsqueeze(0)
         tokens = self._tokenize(text)
         batch = {
             "input_values": input_values,
             "audio_mask": audio_mask.to(self.device),
             "input_ids": tokens["input_ids"].to(self.device),
             "text_mask": tokens["text_mask"].to(self.device),
+            "handcrafted": handcrafted.to(self.device),
         }
         with torch.no_grad():
             outputs = self.model(batch)

@@ -17,6 +17,7 @@ class FusionModel(nn.Module):
         urgency_levels: int,
         sentiment_levels: int,
         pooling: str = "attn",
+        handcrafted_dim: int = 13,
         fusion_dim: int = 256,
         dropout: float = 0.2,
     ) -> None:
@@ -30,10 +31,14 @@ class FusionModel(nn.Module):
         audio_dim = self.audio_encoder.model.config.hidden_size
         text_dim = self.text_encoder.model.config.hidden_size
 
+        self.audio_norm = nn.LayerNorm(audio_dim)
+        self.handcrafted_norm = nn.LayerNorm(handcrafted_dim)
+        self.handcrafted_dim = handcrafted_dim
+
         # Fusion layer
         self.fusion = nn.Sequential(
-            nn.LayerNorm(audio_dim + text_dim),
-            nn.Linear(audio_dim + text_dim, fusion_dim),
+            nn.LayerNorm(audio_dim + handcrafted_dim + text_dim),
+            nn.Linear(audio_dim + handcrafted_dim + text_dim, fusion_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
@@ -58,13 +63,27 @@ class FusionModel(nn.Module):
         # Audio embedding
         audio_mask = batch[audio_mask_key] if audio_mask_key in batch else None
         audio_embed = self.audio_encoder(batch[audio_key], audio_mask)
+        audio_embed = self.audio_norm(audio_embed)
+
+        handcrafted = batch.get("handcrafted")
+        if handcrafted is None:
+            handcrafted = torch.zeros(
+                audio_embed.shape[0],
+                self.handcrafted_dim,
+                device=audio_embed.device,
+            )
+        handcrafted = torch.clamp(handcrafted.float().to(audio_embed.device), min=0.0)
+        handcrafted = torch.log1p(handcrafted)
+        handcrafted = self.handcrafted_norm(handcrafted)
+
+        audio_combined = torch.cat([audio_embed, handcrafted], dim=-1)
 
         # Text embedding
         text_mask = batch[text_mask_key] if text_mask_key in batch else None
         text_embed = self.text_encoder(batch[text_key], text_mask)
 
         # Fusion
-        shared = self.fusion(torch.cat([audio_embed, text_embed], dim=-1))
+        shared = self.fusion(torch.cat([audio_combined, text_embed], dim=-1))
 
         # Output
         return {
