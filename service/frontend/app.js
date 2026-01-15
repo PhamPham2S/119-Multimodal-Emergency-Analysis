@@ -189,7 +189,7 @@ function App() {
       h(
         "div",
         { className: "subtitle" },
-        "Combine HuBERT audio embeddings with KcELECTRA text context to estimate urgency and sentiment in one pass."
+        "Combine wav2vec2 audio embeddings with KcELECTRA text context to estimate urgency and sentiment in one pass."
       )
     ),
     h(
@@ -240,7 +240,7 @@ function App() {
         renderGold()
       )
     ),
-    h("div", { className: "footer" }, "Powered by HuBERT + KcELECTRA fusion heads.")
+    h("div", { className: "footer" }, "Powered by wav2vec2 + KcELECTRA fusion heads.")
   );
 }
 

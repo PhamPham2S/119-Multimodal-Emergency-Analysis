@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 
 from audio.data_io import load_audio
+from audio.features import extract_handcrafted_features
 from text.processing import extract_text
 
 try:
@@ -102,18 +103,21 @@ class AudioTextDataset(Dataset):
     def __len__(self) -> int:
         return len(self.records)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str, int, int]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, str, int, int]:
         record = self.records[idx]
         audio = load_audio(record.audio_path, self.sample_rate)
+        handcrafted = extract_handcrafted_features(audio, self.sample_rate)
         urg_id, sent_id = self.label_mapper.encode(record.urgency, record.sentiment)
-        return audio, record.text, urg_id, sent_id
+        return audio, handcrafted, record.text, urg_id, sent_id
 
 def make_collate(
     tokenizer: AutoTokenizer,
     max_text_len: int,
 ):
-    def collate(batch: Sequence[Tuple[torch.Tensor, str, int, int]]) -> Dict[str, torch.Tensor]:
-        audios, texts, urg, sent = zip(*batch)
+    def collate(
+        batch: Sequence[Tuple[torch.Tensor, torch.Tensor, str, int, int]]
+    ) -> Dict[str, torch.Tensor]:
+        audios, handcrafted, texts, urg, sent = zip(*batch)
         lengths = torch.tensor([a.shape[-1] for a in audios], dtype=torch.long)
         max_len = int(lengths.max().item())
         padded = torch.zeros(len(audios), max_len, dtype=torch.float)
@@ -129,11 +133,13 @@ def make_collate(
             max_length=max_text_len,
             return_tensors="pt",
         )
+        handcrafted_tensor = torch.stack([feat for feat in handcrafted])
         return {
             "input_values": padded,
             "audio_mask": audio_mask,
             "input_ids": text_inputs["input_ids"],
             "text_mask": text_inputs["attention_mask"],
+            "handcrafted": handcrafted_tensor,
             "urgency": torch.tensor(urg, dtype=torch.long),
             "sentiment": torch.tensor(sent, dtype=torch.long),
         }

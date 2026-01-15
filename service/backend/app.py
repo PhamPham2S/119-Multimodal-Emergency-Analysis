@@ -24,7 +24,7 @@ DATA_ROOT = REPO_ROOT / "data" / "Sample"
 MODEL_DIR = REPO_ROOT / "models"
 FRONTEND_DIR = REPO_ROOT / "service" / "frontend"
 
-AUDIO_MODEL = os.getenv("AUDIO_MODEL", "facebook/hubert-base-ls960")
+AUDIO_MODEL = os.getenv("AUDIO_MODEL", "facebook/wav2vec2-base-960h")
 TEXT_MODEL = os.getenv("TEXT_MODEL", "beomi/KcELECTRA-base")
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 MAX_TEXT_LEN = int(os.getenv("MAX_TEXT_LEN", "256"))
