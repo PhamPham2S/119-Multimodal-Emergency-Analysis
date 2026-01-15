@@ -1,5 +1,8 @@
 # 🚨 멀티모달 기반 119 신고 긴급도 판별
 
+## Demo
+![LikeLion_실전프로젝트01_시연영상_압축본](https://github.com/user-attachments/assets/81dbb74e-2bf2-4fa6-81c6-b1703033bcee)
+
 ## 👥 Team & Roles
 
 - **전체(2)**  @Jinhyeok33 @EalZz
