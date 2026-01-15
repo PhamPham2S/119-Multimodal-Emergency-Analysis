@@ -84,8 +84,8 @@
 
 4. **Prediction**
    - 얕은 MLP Head를 통해
-     - 긴급도(하/중/상)
-     - 감정 상태
+     - 긴급도("하","중","상")
+     - 감정 상태("당황/난처", "불안/걱정", "중립", "기타부정")
      별도 예측
 
 ---
@@ -114,8 +114,8 @@
 
 ### Prediction Head
 - **얕은 MLP 구조**
-Linear → ReLU → Dropout → Linear
-
+Linear → ReLU → Dropout Linear → ReLU → Dropout → urgency head
+                                                → sentiment head
 
 ---
 
@@ -144,8 +144,8 @@ Linear → ReLU → Dropout → Linear
 - Audio + Text 멀티모달 모델
 
 ### Evaluation Metrics
-- Macro F1-score
-- Urgency 단계별 혼동 행렬
+- Sentiment Binary Cross Entropy
+- Urgency Ordinal Loss
 
 ---
 
