@@ -172,16 +172,19 @@ Linear → ReLU → Dropout Linear → ReLU → Dropout → urgency head
 
 ## 📂 Project Structure
 ```text
-NewJeans-5
-├── service/
+119-Multimodal-Emergency-Analysis
+├── data/
+| ├── emb/     # 사전 임베딩 벡터(.npy, .pkl)
+| └── Sample/  # 샘플 데이터(.wav, .json)
+├── models/    # 학습된 모델 가중치(.pt)
+├── service/   # 로컬 서버 추론용
 | ├── frontend/
 | ├── backend/
 | ├── plan_frontend.md
 ├── src/
-| ├── core/  # 전체 아키텍처 및 파이프라인
-| ├── audio/ # 음성 전처리 및 오디오 인코더
-| ├── text/  # 텍스트 인코더 및 처리
-| └── train/ # 학습, loss, dataset
+| ├── core/    # 전체 파이프라인 및 학습 코드
+| ├── audio/   # 음성 전처리 및 오디오 인코더
+| └── text/    # 텍스트 인코더 및 처리
 ├── train.ipynb  # 코랩용 학습 스크립트
 └── requirements.txt
 ```
